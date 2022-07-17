@@ -292,15 +292,13 @@ function Get-ADTunnel{
             [pscustomobject]@{
                 Timestamp = ([datetime]($split[4]+' '+$split[5])).ToString("yyyy-MM-dd HH:mm:ss")
                 LocalPort = $split[-3]
-                RemoteIP = $remote[0]
-                RemotePort = $remote[-1]
+                ForwardedIP = $remote[0]
+                ForwardedPort = $remote[-1]
             }
         }
     }
     $obj
 }
-
-
 
 function Get-ADTunnelConnections{
 <#
@@ -313,7 +311,7 @@ function Get-ADTunnelConnections{
         Location to the ad_svc.trace or ad.trace log.
 
     .EXAMPLE
-        Get-Get-ADTunnelConnections -logFile c:\ad_svc.trace
+        Get-ADTunnelConnections -logFile c:\ad_svc.trace
 
         Parses C:\ad_svc.trace and returns tunnel data
 #>
@@ -339,14 +337,14 @@ function Get-ADTunnelConnections{
             }           
         }
         if($tunnelTimestamp.Length -eq 0){
-            $tunnelTimestamp = 'n'
+            $tunnelTimestamp = '-'
         }
         [pscustomobject]@{
             Timestamp = $connectTimestamp
             OutgoingID = ($startSplit[-1]).Trim('"')
             LocalPort = $split[-3]
-            RemoteIP = $remote[0]
-            RemotePort = $remote[-1]
+            ForwardedIP = $remote[0]
+            ForwardedPort = $remote[-1]
             TunnelTimestamp =$tunnelTimestamp
         }   
     }
@@ -363,4 +361,132 @@ function Get-ADTunnelConnections{
             $index += 1
         }
     }
+    $obj | Format-Table
+}
+
+function Get-ADForwardedTunnels{
+<#
+    .SYNOPSIS
+        Parses the ad_svc.trace log (for installed instances of AnyDesk) or ad.trace log (for portable instances of AnyDesk) and returns a list of forwarded tunnels from the 
+        system to include timestamps associated with the connections. 
+
+
+    .PARAMETER logFile
+        Location to the ad_svc.trace or ad.trace log.
+
+    .EXAMPLE
+        Get-ADForwardedTunnels -logFile c:\ad_svc.trace
+
+        Parses C:\ad_svc.trace and returns tunnel data
+#>
+    
+    [CmdletBinding()]
+    param(
+        $logfile
+    )    
+
+    $log = Get-Content $logfile
+    $end = $log.IndexOf($log[-1])
+    $lines = $log | Select-String -Pattern 'accept request from'
+    $obj = @()
+    $obj = foreach($line in $lines){
+        $tunnelTimestamp = ''
+        $startSplit = $line -split ' '
+        $connectTimestamp = ([datetime]($startSplit[4]+' '+$startSplit[5])).ToString("yyyy-MM-dd HH:mm:ss")
+        $id = $startSplit[-3]
+        $index = $log.IndexOf($line) + 20
+        for($i = $index; $i -gt ($index - 20); $i--){
+            if($log[$i] -match "anynet.any_socket - Logged in from "){
+                $netData = (($log[$i] -split ' ')[-4]) -split ':'
+            }           
+        }
+        [pscustomobject]@{
+            Timestamp = $connectTimestamp
+            IncomingID = $id
+            IncomingIP = $netData[0]
+            ForwardedIP = '-'
+            ForwardedPort = '-'
+            TunnelTimestamp = '-'
+        }   
+    }
+    $tunConnect = $log | Select-String -Pattern 'Requesting a TCP-Tunnel'
+    foreach($line in $tunConnect){
+        $split = $line -split ' '
+        $date = ([datetime]($split[4]+' '+$split[5])).ToString("yyyy-MM-dd HH:mm:ss")
+        $index = 0
+        foreach($item in $obj){
+            if($date -gt $item.timestamp -AND $date -lt $obj[($index + 1)].timestamp){
+                $item.TunnelTimestamp = $date
+                $item.forwardedport = ($split[-1]).Trim('.')
+                $item.forwardedip = $split[-4]
+            }
+            $index += 1
+        }
+    }
+}
+
+function Get-ADFileTransferTo{
+<#
+    .SYNOPSIS
+        Parses the ad_svc.trace log (for installed instances of AnyDesk) or ad.trace log (for portable instances of AnyDesk) and returns a list directories from which a 
+        file or files were transferrred from to a remote system. The list also includes the timstamp of the AnyDesk connection, the remote anydesk ID and IP, as well as
+        the transfer timestamp.
+
+    .PARAMETER logFile
+        Location to the ad_svc.trace or ad.trace log.
+
+    .EXAMPLE
+        Get-ADFileTransferTo -logFile c:\ad_svc.trace
+
+        Parses C:\ad_svc.trace and returns tunnel data
+#>
+    
+    [CmdletBinding()]
+    param(
+        $logfile
+    )    
+    $log = Get-Content $logfile
+    $lines = $log | Select-String -Pattern 'accept request from'
+    $obj = @()
+    $obj = foreach($line in $lines){
+        $split = $line -split ' '
+        $index = $log.IndexOf($line) + 20
+        for($i = $index; $i -gt ($index - 20); $i--){
+            if($log[$i] -match "anynet.any_socket - Logged in from "){
+                $netData = (($log[$i] -split ' ')[-4]) -split ':'
+                break
+            }           
+        }
+        [pscustomobject]@{
+            Timestamp = ([datetime]($split[4]+' '+$split[5])).ToString("yyyy-MM-dd HH:mm:ss")
+            ConnectedID = $split[-3]
+            ConnectedIP = $netData[0]
+            TransferTimestamp = '-'
+            SourceDirectory = '-'
+        }
+    }
+
+    $fileTask = $log | select-string -Pattern "app.prepare_task - Preparing files in"
+    foreach($line in $fileTask){
+        $split = $line -split ' '
+        $date = ([datetime]($split[4]+' '+$split[5])).ToString("yyyy-MM-dd HH:mm:ss")
+        $index = 0
+        foreach($item in $obj){
+            if($date -gt $item.timestamp -AND $date -lt $obj[($index + 1)].timestamp){
+                $item.TransferTimestamp = $date
+                $item.SourceDirectory = $split[-1].Trim("'.")
+            }
+            $index += 1
+        }
+    }
+    $obj | Format-Table
+}
+
+function Get-ADFileTransferFrom{
+
+
+}
+
+function keyboard{
+    desk_rt.capture_component - Keyboard layout changed to: en_us
 }
