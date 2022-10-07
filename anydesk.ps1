@@ -664,6 +664,11 @@ function Get-ADFilePaste{
         Parses C:\ad_svc.trace and returns the applicable data
 #>
 
+    [CmdletBinding()]
+    param(
+        $logfile
+    )    
+
     $log = Get-Content $logfile
     $lines = $log | Select-String -Pattern 'ole.files - Finished file paste operation'
     $obj = @()
