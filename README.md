@@ -2,14 +2,14 @@
 A series of functions to parse AnyDesk logs to answer specific questions.
 
 # Locations of logs of Interest
-* %programdata%\anydesk
-* %appdata%\anydesk
-* %userprofile%\pictures
-* %userprofile%\videos
+* `%programdata%\anydesk`
+* `%appdata%\anydesk`
+* `%userprofile%\pictures`
+* `%userprofile%\videos`
 
 # Questions that can be Answered
-* What outgoing connections haas this machine made?
-* Of those connections, which connections were the successful and unsuccessful?
+* What outgoing connections has this machine made?
+* Of those connections, which connections were successful and unsuccessful?
 * What incoming connections were made to this machine?
 * What PID was tied to that connection and were there child process spawned?
 * What IPs are communicating with this machine?
