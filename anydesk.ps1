@@ -655,26 +655,40 @@ function Get-ADFilePaste{
         Parses the ad_svc.trace log (for installed instances of AnyDesk) or ad.trace log (for portable instances of AnyDesk) and returns the the timestamp associated with a file being "pasted" from being 
         copied from a remote AnyDesk session.
 
-    .PARAMETER logFile
-        Location to the ad_svc.trace or ad.trace log.
+    .PARAMETER LogFile
+        Specifies the path of the ad_svc.trace or ad.trace log file.
 
     .EXAMPLE
-        Get-ADFileTransferTo -logFile c:\ad_svc.trace
+        Get-ADFilePaste -LogFile c:\ad_svc.trace
 
         Parses C:\ad_svc.trace and returns the applicable data
 #>
+param(
+    [Parameter(Mandatory=$true)]
+    [ValidateScript({if (!(Test-Path $_)) { throw "The provided value for 'LogFile' is not a valid file path." } })]
+    [string]$LogFile
+)
 
-    $log = Get-Content $logfile
-    $lines = $log | Select-String -Pattern 'ole.files - Finished file paste operation'
-    $obj = @()
-    $obj = foreach($line in $lines){
-        $split = $line -split ' '
-        $index = $log.IndexOf($line) + 1
-        $fileTime = $log[$index].Split(' ')
-
-        [pscustomobject]@{
-            TransferredTimestamp = ([datetime]($fileTime[4]+' '+$filetime[5])).ToString("yyyy-MM-dd HH:mm:ss")
+    try {
+        $log = Get-Content -Path $LogFile -ErrorAction Stop
+        if($log){
+            $lines = $log | Select-String -Pattern 'ole.files - Finished file paste operation'
+            $obj = @()
+            $obj = foreach($line in $lines){
+                $split = $line -split ' '
+                $index = $log.IndexOf($line) + 1
+                $fileTime = $log[$index].Split(' ')
+    
+                [pscustomobject]@{
+                    TransferredTimestamp = ([datetime]($fileTime[4]+' '+$filetime[5])).ToString("yyyy-MM-dd HH:mm:ss")
+                }
+            }
+            $obj | Format-Table
+        } else {
+            Write-Error "Log file is empty."
         }
     }
-    $obj | Format-Table
+    catch {
+        Write-Error "An error occurred: $_"
+    }
 }
